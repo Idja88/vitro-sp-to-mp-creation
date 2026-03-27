@@ -1,1 +1,7 @@
+__pycache__/
+*.pyc
 .env
+.venv/
+uv.lock
+.python-version
+credentials.json

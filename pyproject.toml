@@ -1,0 +1,14 @@
+[project]
+name = "vitro-sp-to-mp-creation"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+"google-api-python-client==2.111.0",
+"google-auth-oauthlib==1.1.0",
+"google-auth-httplib2==0.2.0",
+"google-auth==2.25.2",
+"gspread==5.11.0",
+"python-dotenv==1.0.0",
+"requests==2.31.0"]

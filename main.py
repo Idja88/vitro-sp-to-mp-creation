@@ -1,28 +1,31 @@
 import json
 import requests
-import dotenv
+import os
+from dotenv import load_dotenv
+from vitro_cad_api import get_mp_token, update_mp_list
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+import gspread
 
-def get_mp_token(mp_url, mp_login):
-    url_string = f"{mp_url}/api/security/login"
-    try:
-        with requests.post(url=url_string, json=mp_login) as response:
-            response.raise_for_status()
-            response_json = json.loads(response.text)
-            value = response_json['token']
-            return value
-    except requests.exceptions.RequestException as e:
-        print(f"Error occurred: {e}")
-        return None
+load_dotenv()
 
-def update_mp_list(mp_url, mp_token, data):
-    url_string = f"{mp_url}/api/item/update"
-    item_list_json = json.dumps(data)
-    item_update_request = {'itemListJson': item_list_json}
-    try:
-        with requests.post(url=url_string, headers={'Authorization': mp_token}, data=item_update_request) as response:
-            response.raise_for_status()
-            response_json = json.loads(response.text)
-            return response_json
-    except requests.exceptions.RequestException as e:
-        print(f"Error occurred: {e}")
-        return None
+SCOPES = [
+    'https://www.googleapis.com/auth/spreadsheets',
+    'https://www.googleapis.com/auth/drive'
+]
+
+creds = service_account.Credentials.from_service_account_file(
+    os.getenv("GOOGLE_APPLICATION_CREDENTIALS"), 
+    scopes=SCOPES
+)
+
+gc = gspread.authorize(creds)
+
+drive_service = build('drive', 'v3', credentials=creds)
+
+def main():
+
+    return
+
+if __name__ == '__main__':
+    main()
