@@ -16,7 +16,6 @@ SCOPES = [
     'https://www.googleapis.com/auth/drive'
 ]
 
-
 class VitroAutomation:
     """Main automation class for Vitro-CAD MP metadata migration."""
     
@@ -671,7 +670,6 @@ class VitroAutomation:
                     "content_type_id": self.CONTENT_TYPE_FIELD_CTYPE_ID,
                     "content_type": ctype_id,
                     "field": attr_id,
-                    #"name": f"{ctype_name}_{attr_name}",
                     "required": self.convert_value(record.get("MP_ATTRIBUTE_IS_REQUIRED"), "bool"),
                     "read_only": self.convert_value(record.get("MP_ATTRIBUTE_IS_READ_ONLY"), "bool")
                 }
@@ -739,8 +737,7 @@ class VitroAutomation:
                     "list_id": self.LIST_CONTENT_TYPE_LIST_ID,
                     "content_type_id": self.LIST_CONTENT_TYPE_CTYPE_ID,
                     "content_type": ctype_id,
-                    "list": list_id,
-                    #"name": f"{list_name}_{ctype_name}"
+                    "list": list_id
                 }
                 
                 data = {k: v for k, v in data.items() if v is not None}
