@@ -69,6 +69,14 @@ class VitroAutomation:
         """Load all constants from .env file."""
         self.CREATION_TOOL = "CREATION_TOOL"
         
+        # Sheet names from .env
+        self.SHEET_LISTS = os.getenv('SHEET_LISTS')
+        self.SHEET_CTYPES_UNIQUE = os.getenv('SHEET_CTYPES_UNIQUE')
+        self.SHEET_ATTRIBUTES_UNIQUE = os.getenv('SHEET_ATTRIBUTES_UNIQUE')
+        self.SHEET_ATTRIBUTES = os.getenv('SHEET_ATTRIBUTES')
+        self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE = os.getenv('SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE')
+        self.SHEET_CTYPES = os.getenv('SHEET_CTYPES')
+        
         # Stage 1 Constants (Lists)
         self.LISTS_CTYPE_ID = os.getenv('LISTS_CTYPE_ID')
         
@@ -96,13 +104,13 @@ class VitroAutomation:
         
         # Pre-load sheet headers
         self.sheet_headers = {}
-        for sheet_name in ["LISTS", "CTYPES_UNIQUE", "ATTRIBUTES_UNIQUE", "ATTRIBUTES", "CTYPES"]:
+        for sheet_name in [self.SHEET_LISTS, self.SHEET_CTYPES_UNIQUE, self.SHEET_ATTRIBUTES_UNIQUE, self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE, self.SHEET_CTYPES]:
             ws = self.get_sheet(sheet_name)
             if ws:
                 self.sheet_headers[sheet_name] = ws.row_values(1)
         
         # Load lists
-        list_records = self.get_all_records("LISTS")
+        list_records = self.get_all_records(self.SHEET_LISTS)
         for record in list_records:
             list_name = record.get("MP_LIST_NAME")
             list_id = record.get("MP_LIST_ID")
@@ -110,7 +118,7 @@ class VitroAutomation:
                 self.list_cache[list_name] = list_id
         
         # Load content types
-        ctype_records = self.get_all_records("CTYPES_UNIQUE")
+        ctype_records = self.get_all_records(self.SHEET_CTYPES_UNIQUE)
         for record in ctype_records:
             ctype_name = record.get("MP_CTYPE_NAME")
             ctype_id = record.get("MP_CTYPE_ID")
@@ -118,7 +126,7 @@ class VitroAutomation:
                 self.ctype_cache[ctype_name] = ctype_id
         
         # Load attributes
-        attr_records = self.get_all_records("ATTRIBUTES_UNIQUE")
+        attr_records = self.get_all_records(self.SHEET_ATTRIBUTES_UNIQUE)
         for record in attr_records:
             attr_name = record.get("MP_ATTRIBUTE_NAME")
             attr_id = record.get("MP_ATTRIBUTE_ID")
@@ -354,9 +362,9 @@ class VitroAutomation:
         print("="*60)
         
         time.sleep(self.google_api_delay)  # Rate limiting
-        records = self.get_all_records("LISTS")
+        records = self.get_all_records(self.SHEET_LISTS)
         if not records:
-            print("No records found in LISTS sheet")
+            print(f"No records found in {self.SHEET_LISTS} sheet")
             return
         
         for idx, record in enumerate(records, start=2):  # Start at row 2 (after header)
@@ -390,14 +398,14 @@ class VitroAutomation:
                 
                 if response and response.get('id'):
                     list_id = response.get('id')
-                    self.update_sheet_cell("LISTS", idx, "MP_LIST_ID", list_id)
+                    self.update_sheet_cell(self.SHEET_LISTS, idx, "MP_LIST_ID", list_id)
                     self.list_cache[record.get("MP_LIST_NAME")] = list_id
-                    self.log_to_sheet("LISTS", idx, f"List created: {list_id}")
+                    self.log_to_sheet(self.SHEET_LISTS, idx, f"List created: {list_id}")
                 else:
-                    self.log_to_sheet("LISTS", idx, f"ERROR: {response}")
+                    self.log_to_sheet(self.SHEET_LISTS, idx, f"ERROR: {response}")
             
             except Exception as e:
-                self.log_to_sheet("LISTS", idx, f"ERROR: {str(e)}")
+                self.log_to_sheet(self.SHEET_LISTS, idx, f"ERROR: {str(e)}")
         
         # Flush all queued batch updates
         time.sleep(self.google_api_delay)  # Rate limiting before flush
@@ -411,9 +419,9 @@ class VitroAutomation:
         print("="*60)
         
         time.sleep(self.google_api_delay)  # Rate limiting
-        records = self.get_all_records("CTYPES_UNIQUE")
+        records = self.get_all_records(self.SHEET_CTYPES_UNIQUE)
         if not records:
-            print("No records found in CTYPES_UNIQUE sheet")
+            print(f"No records found in {self.SHEET_CTYPES_UNIQUE} sheet")
             return
         
         for idx, record in enumerate(records, start=2):
@@ -449,14 +457,14 @@ class VitroAutomation:
                 
                 if response and response.get('id'):
                     ctype_id = response.get('id')
-                    self.update_sheet_cell("CTYPES_UNIQUE", idx, "MP_CTYPE_ID", ctype_id)
+                    self.update_sheet_cell(self.SHEET_CTYPES_UNIQUE, idx, "MP_CTYPE_ID", ctype_id)
                     self.ctype_cache[record.get("MP_CTYPE_NAME")] = ctype_id
-                    self.log_to_sheet("CTYPES_UNIQUE", idx, f"Content type created: {ctype_id}")
+                    self.log_to_sheet(self.SHEET_CTYPES_UNIQUE, idx, f"Content type created: {ctype_id}")
                 else:
-                    self.log_to_sheet("CTYPES_UNIQUE", idx, f"ERROR: {response}")
+                    self.log_to_sheet(self.SHEET_CTYPES_UNIQUE, idx, f"ERROR: {response}")
             
             except Exception as e:
-                self.log_to_sheet("CTYPES_UNIQUE", idx, f"ERROR: {str(e)}")
+                self.log_to_sheet(self.SHEET_CTYPES_UNIQUE, idx, f"ERROR: {str(e)}")
         
         # Flush all queued batch updates
         time.sleep(self.google_api_delay)  # Rate limiting before flush
@@ -470,9 +478,9 @@ class VitroAutomation:
         print("="*60)
         
         time.sleep(self.google_api_delay)  # Rate limiting
-        records = self.get_all_records("ATTRIBUTES_UNIQUE")
+        records = self.get_all_records(self.SHEET_ATTRIBUTES_UNIQUE)
         if not records:
-            print("No records found in ATTRIBUTES_UNIQUE sheet")
+            print(f"No records found in {self.SHEET_ATTRIBUTES_UNIQUE} sheet")
             return
         
         for idx, record in enumerate(records, start=2):
@@ -632,14 +640,14 @@ class VitroAutomation:
                 
                 if response and response.get('id'):
                     attr_id = response.get('id')
-                    self.update_sheet_cell("ATTRIBUTES_UNIQUE", idx, "MP_ATTRIBUTE_ID", attr_id)
+                    self.update_sheet_cell(self.SHEET_ATTRIBUTES_UNIQUE, idx, "MP_ATTRIBUTE_ID", attr_id)
                     self.attr_cache[record.get("MP_ATTRIBUTE_NAME")] = attr_id
-                    self.log_to_sheet("ATTRIBUTES_UNIQUE", idx, f"Attribute created: {attr_id}")
+                    self.log_to_sheet(self.SHEET_ATTRIBUTES_UNIQUE, idx, f"Attribute created: {attr_id}")
                 else:
-                    self.log_to_sheet("ATTRIBUTES_UNIQUE", idx, f"ERROR: {response}")
+                    self.log_to_sheet(self.SHEET_ATTRIBUTES_UNIQUE, idx, f"ERROR: {response}")
             
             except Exception as e:
-                self.log_to_sheet("ATTRIBUTES_UNIQUE", idx, f"ERROR: {str(e)}")
+                self.log_to_sheet(self.SHEET_ATTRIBUTES_UNIQUE, idx, f"ERROR: {str(e)}")
         
         # Flush all queued batch updates
         time.sleep(self.google_api_delay)  # Rate limiting before flush
@@ -653,9 +661,9 @@ class VitroAutomation:
         print("="*60)
         
         time.sleep(self.google_api_delay)  # Rate limiting
-        records = self.get_all_records("CTYPES_TO_ATTRIBUTES_UNIQUE")
+        records = self.get_all_records(self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE)
         if not records:
-            print("No records found in CTYPES_TO_ATTRIBUTES_UNIQUE sheet")
+            print(f"No records found in {self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE} sheet")
             return
         
         for idx, record in enumerate(records, start=2):
@@ -668,7 +676,7 @@ class VitroAutomation:
                 # Skip if MP_ATTRIBUTE_INTERNAL_NAME == "name" or "Title"
                 mp_internal_name = record.get("MP_ATTRIBUTE_INTERNAL_NAME", "").strip()
                 if mp_internal_name.lower() == "name":
-                    self.log_to_sheet("ATTRIBUTES", idx, "Skipped because MP_ATTRIBUTE_INTERNAL_NAME is 'name'")
+                    self.log_to_sheet(self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE, idx, "Skipped because MP_ATTRIBUTE_INTERNAL_NAME is 'name'")
                     continue
                 
                 # Idempotency check
@@ -682,11 +690,11 @@ class VitroAutomation:
                 
                 # Try to get from cache, if not present skip for now
                 if ctype_name not in self.ctype_cache:
-                    self.log_to_sheet("ATTRIBUTES", idx, f"WARNING: Content type not found in cache: {ctype_name}")
+                    self.log_to_sheet(self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE, idx, f"WARNING: Content type not found in cache: {ctype_name}")
                     continue
                 
                 if attr_name not in self.attr_cache:
-                    self.log_to_sheet("ATTRIBUTES", idx, f"WARNING: Attribute not found in cache: {attr_name}")
+                    self.log_to_sheet(self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE, idx, f"WARNING: Attribute not found in cache: {attr_name}")
                     continue
                 
                 ctype_id = self.ctype_cache[ctype_name]
@@ -708,13 +716,13 @@ class VitroAutomation:
                 response = self.api_client.update_mp_list(data)
                 
                 if response and response.get('id'):
-                    self.update_sheet_cell("ATTRIBUTES", idx, "SYNC_DONE", "SUCCESS")
-                    self.log_to_sheet("ATTRIBUTES", idx, "Attribute added to type")
+                    self.update_sheet_cell(self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE, idx, "SYNC_DONE", "SUCCESS")
+                    self.log_to_sheet(self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE, idx, "Attribute added to type")
                 else:
-                    self.log_to_sheet("ATTRIBUTES", idx, f"ERROR: {response}")
+                    self.log_to_sheet(self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE, idx, f"ERROR: {response}")
             
             except Exception as e:
-                self.log_to_sheet("ATTRIBUTES", idx, f"ERROR: {str(e)}")
+                self.log_to_sheet(self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE, idx, f"ERROR: {str(e)}")
         
         # Flush all queued batch updates
         time.sleep(self.google_api_delay)  # Rate limiting before flush
@@ -728,9 +736,9 @@ class VitroAutomation:
         print("="*60)
         
         time.sleep(self.google_api_delay)  # Rate limiting
-        records = self.get_all_records("CTYPES")
+        records = self.get_all_records(self.SHEET_CTYPES)
         if not records:
-            print("No records found in CTYPES sheet")
+            print(f"No records found in {self.SHEET_CTYPES} sheet")
             return
         
         for idx, record in enumerate(records, start=2):
@@ -750,11 +758,11 @@ class VitroAutomation:
                 ctype_name = record.get("MP_CTYPE_NAME")
                 
                 if list_name not in self.list_cache:
-                    self.log_to_sheet("CTYPES", idx, f"WARNING: List not found in cache: {list_name}")
+                    self.log_to_sheet(self.SHEET_CTYPES, idx, f"WARNING: List not found in cache: {list_name}")
                     continue
                 
                 if ctype_name not in self.ctype_cache:
-                    self.log_to_sheet("CTYPES", idx, f"WARNING: Content type not found in cache: {ctype_name}")
+                    self.log_to_sheet(self.SHEET_CTYPES, idx, f"WARNING: Content type not found in cache: {ctype_name}")
                     continue
                 
                 list_id = self.list_cache[list_name]
@@ -774,13 +782,13 @@ class VitroAutomation:
                 response = self.api_client.update_mp_list(data)
                 
                 if response and response.get('id'):
-                    self.update_sheet_cell("CTYPES", idx, "SYNC_DONE", "SUCCESS")
-                    self.log_to_sheet("CTYPES", idx, "Type added to list")
+                    self.update_sheet_cell(self.SHEET_CTYPES, idx, "SYNC_DONE", "SUCCESS")
+                    self.log_to_sheet(self.SHEET_CTYPES, idx, "Type added to list")
                 else:
-                    self.log_to_sheet("CTYPES", idx, f"ERROR: {response}")
+                    self.log_to_sheet(self.SHEET_CTYPES, idx, f"ERROR: {response}")
             
             except Exception as e:
-                self.log_to_sheet("CTYPES", idx, f"ERROR: {str(e)}")
+                self.log_to_sheet(self.SHEET_CTYPES, idx, f"ERROR: {str(e)}")
         
         # Flush all queued batch updates
         time.sleep(self.google_api_delay)  # Rate limiting before flush
