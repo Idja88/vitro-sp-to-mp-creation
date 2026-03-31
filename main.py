@@ -271,37 +271,60 @@ class VitroAutomation:
             self.batch_updates[sheet_name][col_index].append((row_index, value))
     
     def flush_batch_updates(self):
-        """Send all queued updates to Google Sheets in batch."""
+        """Send all queued updates to Google Sheets in batch with chunking and retry logic."""
         if not self.batch_updates:
             return
         
-        print(f"\nFlushing {sum(len(cols) for cols in self.batch_updates.values())} batch updates...")
+        total_updates = sum(len(cols) for cols in self.batch_updates.values())
+        print(f"\nFlushing {total_updates} batch updates (in chunks of 100)...")
         
         for sheet_name, col_updates in self.batch_updates.items():
             # Build list of updates in correct format for Google Sheets API
-            data = []
+            all_data = []
             for col_index, cells in col_updates.items():
                 for row_index, value in cells:
                     # Convert column index to letter (1-based: A, B, C, ... Z, AA, AB, ...)
                     col_letter = self._col_index_to_letter(col_index)
-                    data.append({
+                    all_data.append({
                         'range': f'{sheet_name}!{col_letter}{row_index}',
                         'values': [[value]]
                     })
             
-            # Send batch update using Google Sheets API
-            if data:
-                try:
-                    self.sheets_service.spreadsheets().values().batchUpdate(
-                        spreadsheetId=self.spreadsheet_id,
-                        body={
-                            'data': data,
-                            'valueInputOption': 'RAW'
-                        }
-                    ).execute()
-                    print(f"  ✓ {sheet_name}: {len(data)} cells updated")
-                except Exception as e:
-                    print(f"  ✗ {sheet_name}: Batch update failed: {e}")
+            if not all_data:
+                continue
+            
+            # Send updates in chunks of 100 to avoid connection timeout
+            chunk_size = 100
+            total_chunks = (len(all_data) + chunk_size - 1) // chunk_size
+            
+            for chunk_idx in range(0, len(all_data), chunk_size):
+                chunk = all_data[chunk_idx:chunk_idx + chunk_size]
+                chunk_num = chunk_idx // chunk_size + 1
+                
+                # Retry logic with exponential backoff
+                max_retries = 3
+                retry_delays = [1, 2, 4]  # Seconds: 1s, 2s, 4s
+                
+                for attempt in range(max_retries):
+                    try:
+                        self.sheets_service.spreadsheets().values().batchUpdate(
+                            spreadsheetId=self.spreadsheet_id,
+                            body={
+                                'data': chunk,
+                                'valueInputOption': 'RAW'
+                            }
+                        ).execute()
+                        
+                        print(f"  ✓ {sheet_name}: chunk {chunk_num}/{total_chunks} ({len(chunk)} cells) updated")
+                        break  # Success, exit retry loop
+                    
+                    except Exception as e:
+                        if attempt < max_retries - 1:
+                            wait_time = retry_delays[attempt]
+                            print(f"  ⚠ {sheet_name}: chunk {chunk_num} failed, retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})")
+                            time.sleep(wait_time)
+                        else:
+                            print(f"  ✗ {sheet_name}: chunk {chunk_num} failed after {max_retries} attempts: {e}")
         
         # Clear the queue
         self.batch_updates = {}
@@ -630,9 +653,9 @@ class VitroAutomation:
         print("="*60)
         
         time.sleep(self.google_api_delay)  # Rate limiting
-        records = self.get_all_records("ATTRIBUTES")
+        records = self.get_all_records("CTYPES_TO_ATTRIBUTES_UNIQUE")
         if not records:
-            print("No records found in ATTRIBUTES sheet")
+            print("No records found in CTYPES_TO_ATTRIBUTES_UNIQUE sheet")
             return
         
         for idx, record in enumerate(records, start=2):
