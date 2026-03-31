@@ -76,6 +76,7 @@ class VitroAutomation:
         self.CTYPES_LIST_ID = os.getenv('CTYPES_LIST_ID')
         self.CTYPES_CTYPE_ID = os.getenv('CTYPES_CTYPE_ID')
         self.CTYPES_DEFAULT_ELEMENT_ID = os.getenv('CTYPES_DEFAULT_ELEMENT_ID')
+        self.CTYPES_DEFAULT_DOCUMENT_ID = os.getenv('CTYPES_DEFAULT_DOCUMENT_ID')
         
         # Stage 3 Constants (Attributes)
         self.ATTRIBUTES_LIST_ID = os.getenv('ATTRIBUTES_LIST_ID')
@@ -404,10 +405,14 @@ class VitroAutomation:
                     print(f"Row {idx}: Content type already has ID, skipping...")
                     continue
                 
+                # Determine parent_id based on MP_CTYPE_IS_DOCUMENT
+                is_document = self.convert_value(record.get("MP_CTYPE_IS_DOCUMENT"), "bool")
+                parent_id = self.CTYPES_DEFAULT_DOCUMENT_ID if is_document else self.CTYPES_DEFAULT_ELEMENT_ID
+                
                 # Build payload
                 data = {
                     "list_id": self.CTYPES_LIST_ID,
-                    "parent_id": self.CTYPES_DEFAULT_ELEMENT_ID,
+                    "parent_id": parent_id,
                     "content_type_id": self.CTYPES_CTYPE_ID,
                     "name": record.get("MP_CTYPE_NAME"),
                     "folder": self.convert_value(record.get("MP_CTYPE_IS_FOLDER"), "bool"),
