@@ -41,6 +41,7 @@ class VitroAutomation:
         self.spreadsheet = self.gc.open_by_key(self.spreadsheet_id)
         
         # Cache for lookups (to avoid duplicate requests)
+        self.site_cache = {}   # MP_SITE_NAME -> MP_SITE_ID
         self.ctype_cache = {}  # MP_CTYPE_NAME -> MP_CTYPE_ID
         self.attr_cache = {}   # MP_ATTRIBUTE_NAME -> MP_ATTRIBUTE_ID
         self.list_cache = {}   # MP_LIST_NAME -> MP_LIST_ID
@@ -70,12 +71,17 @@ class VitroAutomation:
         self.CREATION_TOOL = "CREATION_TOOL"
         
         # Sheet names from .env
+        self.SHEET_SITES = os.getenv('SHEET_SITES')
         self.SHEET_LISTS = os.getenv('SHEET_LISTS')
         self.SHEET_CTYPES_UNIQUE = os.getenv('SHEET_CTYPES_UNIQUE')
         self.SHEET_ATTRIBUTES_UNIQUE = os.getenv('SHEET_ATTRIBUTES_UNIQUE')
         self.SHEET_ATTRIBUTES = os.getenv('SHEET_ATTRIBUTES')
         self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE = os.getenv('SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE')
         self.SHEET_CTYPES = os.getenv('SHEET_CTYPES')
+
+        # Stage 0 Constants (Sites)
+        self.SITES_LIST_ID = os.getenv('SITES_LIST_ID')
+        self.SITES_CTYPE_ID = os.getenv('SITES_CTYPE_ID')
         
         # Stage 1 Constants (Lists)
         self.LISTS_CTYPE_ID = os.getenv('LISTS_CTYPE_ID')
@@ -94,7 +100,7 @@ class VitroAutomation:
         self.CONTENT_TYPE_FIELD_LIST_ID = os.getenv('CONTENT_TYPE_FIELD_LIST_ID')
         self.CONTENT_TYPE_FIELD_CTYPE_ID = os.getenv('CONTENT_TYPE_FIELD_CTYPE_ID')
         
-        # Stage 5 Constants (Bind types to lists)
+        # Stage 5 Constants (Add types to lists)
         self.LIST_CONTENT_TYPE_LIST_ID = os.getenv('LIST_CONTENT_TYPE_LIST_ID')
         self.LIST_CONTENT_TYPE_CTYPE_ID = os.getenv('LIST_CONTENT_TYPE_CTYPE_ID')
     
@@ -104,10 +110,18 @@ class VitroAutomation:
         
         # Pre-load sheet headers
         self.sheet_headers = {}
-        for sheet_name in [self.SHEET_LISTS, self.SHEET_CTYPES_UNIQUE, self.SHEET_ATTRIBUTES_UNIQUE, self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE, self.SHEET_CTYPES]:
+        for sheet_name in [self.SHEET_SITES, self.SHEET_LISTS, self.SHEET_CTYPES_UNIQUE, self.SHEET_ATTRIBUTES_UNIQUE, self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE, self.SHEET_CTYPES]:
             ws = self.get_sheet(sheet_name)
             if ws:
                 self.sheet_headers[sheet_name] = ws.row_values(1)
+        
+        # Load sites
+        site_records = self.get_all_records(self.SHEET_SITES)
+        for record in site_records:
+            site_name = record.get("MP_SITE_NAME")
+            site_id = record.get("MP_SITE_ID")
+            if site_name and site_id:
+                self.site_cache[site_name] = site_id
         
         # Load lists
         list_records = self.get_all_records(self.SHEET_LISTS)
@@ -353,6 +367,62 @@ class VitroAutomation:
     def log_to_sheet(self, sheet_name: str, row_index: int, message: str, column_name: str = "SYNC_LOG"):
         """Queue a log message for batch processing."""
         self.queue_log_message(sheet_name, row_index, message, column_name)
+    
+    # ==================== STAGE 0: CREATE SITES ====================
+    def stage_0_create_sites(self):
+        """Stage 0: Create sites from SITES sheet."""
+        print("\n" + "="*60)
+        print("STAGE 0: Creating Sites")
+        print("="*60)
+
+        time.sleep(self.google_api_delay)  # Rate limiting
+        records = self.get_all_records(self.SHEET_SITES)
+        if not records:
+            print(f"No records found in {self.SHEET_SITES} sheet")
+            return
+        
+        for idx, record in enumerate(records, start=2):  # Start at row 2 (after header)
+            try:
+                # MIGRATION_APPROVED check
+                if not self.convert_value(record.get("MIGRATION_APPROVED"), "bool"):
+                    print(f"Row {idx}: Not approved for migration, skipping...")
+                    continue
+                
+                # Idempotency check
+                if self.is_idempotent_record(record, "MP_SITE_ID"):
+                    print(f"Row {idx}: Site already has ID, skipping...")
+                    continue
+
+                # Build payload
+                data = {
+                    "list_id": self.SITES_LIST_ID,
+                    "content_type_id": self.SITES_CTYPE_ID,
+                    "name": record.get("MP_SITE_NAME"),
+                    "description": self.CREATION_TOOL
+                }
+                
+                # Remove None values
+                data = {k: v for k, v in data.items() if v is not None}
+
+                # API call
+                response = self.api_client.update_mp_list(data)
+
+                if response and response.get('id'):
+                    site_id = response.get('id')
+                    list_of_lists_id = response.get('fieldValueMap').get('list').get('id')
+                    self.update_sheet_cell(self.SHEET_SITES, idx, "MP_SITE_ID", site_id)
+                    self.update_sheet_cell(self.SHEET_SITES, idx, "MP_LIST_OF_LISTS_ID", list_of_lists_id)
+                    self.list_cache[record.get("MP_SITE_NAME")] = site_id
+                    self.log_to_sheet(self.SHEET_SITES, idx, f"Site created: {site_id}")
+                else:
+                    self.log_to_sheet(self.SHEET_SITES, idx, f"ERROR: {response}")
+
+            except Exception as e:
+                self.log_to_sheet(self.SHEET_SITES, idx, f"ERROR: {str(e)}")
+
+        # Flush all queued batch updates
+        time.sleep(self.google_api_delay)  # Rate limiting before flush
+        self.flush_batch_updates()
     
     # ==================== STAGE 1: CREATE LISTS ====================
     def stage_1_create_lists(self):
@@ -800,6 +870,7 @@ class VitroAutomation:
             # Pre-load caches from existing data
             self.preload_caches()
             
+            self.stage_0_create_sites()
             self.stage_1_create_lists()
             self.stage_2_create_ctypes()
             self.stage_3_create_attributes()
@@ -815,7 +886,6 @@ class VitroAutomation:
         
         finally:
             self.api_client.close()
-
 
 def main():
     """Main entry point."""
