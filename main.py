@@ -488,9 +488,9 @@ class VitroAutomation:
     
     # ==================== STAGE 2: CREATE CONTENT TYPES ====================
     def stage_2_create_ctypes(self):
-        """Stage 2: Create content types from CTYPES_UNIQUE sheet."""
+        """Stage 2: Create ctypes from CTYPES_UNIQUE sheet."""
         print("\n" + "="*60)
-        print("STAGE 2: Creating Content Types")
+        print("STAGE 2: Creating ctypes")
         print("="*60)
         
         time.sleep(self.google_api_delay)  # Rate limiting
@@ -547,7 +547,7 @@ class VitroAutomation:
     
     # ==================== STAGE 3: CREATE ATTRIBUTES ====================
     def stage_3_create_attributes(self):
-        """Stage 3: Create attributes using factory pattern based on MP_ATTRIBUTE_FIELD_TYPE."""
+        """Stage 3: Create attributes from ATTRIBUTES_UNIQUE sheet based on MP_ATTRIBUTE_FIELD_TYPE"""
         print("\n" + "="*60)
         print("STAGE 3: Creating Attributes")
         print("="*60)
@@ -729,10 +729,10 @@ class VitroAutomation:
         self.flush_batch_updates()
     
     # ==================== STAGE 4: ADD ATTRIBUTES TO TYPES ====================
-    def stage_4_add_attributes_to_types(self):
-        """Stage 4: Add attributes to content types."""
+    def stage_4_add_attributes_to_ctypes(self):
+        """Stage 4: Add attributes to ctypes."""
         print("\n" + "="*60)
-        print("STAGE 4: Adding Attributes to Types")
+        print("STAGE 4: Adding attributes to ctypes")
         print("="*60)
         
         time.sleep(self.google_api_delay)  # Rate limiting
@@ -805,9 +805,9 @@ class VitroAutomation:
     
     # ==================== STAGE 5: ADD CTYPES TO LISTS ====================
     def stage_5_add_ctypes_to_lists(self):
-        """Stage 5: Add content types to lists."""
+        """Stage 5: Add ctypes to lists."""
         print("\n" + "="*60)
-        print("STAGE 5: Adding Types to Lists")
+        print("STAGE 5: Adding ctypes to Lists")
         print("="*60)
         
         time.sleep(self.google_api_delay)  # Rate limiting
@@ -869,10 +869,10 @@ class VitroAutomation:
         time.sleep(self.google_api_delay)  # Rate limiting before flush
         self.flush_batch_updates()
     
-    def stage_6_add_calculations_to_types(self):
-        """Stage 6: Adding calculations to types."""
+    def stage_6_add_calculations_to_ctypes(self):
+        """Stage 6: Adding calculations to ctypes."""
         print("\n" + "="*60)
-        print("Stage 6: Adding calculations to types.")
+        print("Stage 6: Adding calculations to ctypes.")
         print("="*60)
 
         time.sleep(self.google_api_delay)  # Rate limiting
@@ -941,9 +941,9 @@ class VitroAutomation:
             self.stage_1_create_lists()
             self.stage_2_create_ctypes()
             self.stage_3_create_attributes()
-            self.stage_4_add_attributes_to_types()
+            self.stage_4_add_attributes_to_ctypes()
             self.stage_5_add_ctypes_to_lists()
-            self.stage_6_add_calculations_to_types()
+            self.stage_6_add_calculations_to_ctypes()
             
             print("\n" + "="*60)
             print("MIGRATION COMPLETE")
