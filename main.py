@@ -78,6 +78,7 @@ class VitroAutomation:
         self.SHEET_ATTRIBUTES = os.getenv('SHEET_ATTRIBUTES')
         self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE = os.getenv('SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE')
         self.SHEET_CTYPES = os.getenv('SHEET_CTYPES')
+        self.SHEET_CALCULATIONS = os.getenv('SHEET_CALCULATIONS')
 
         # Stage 0 Constants (Sites)
         self.SITES_LIST_ID = os.getenv('SITES_LIST_ID')
@@ -103,6 +104,10 @@ class VitroAutomation:
         # Stage 5 Constants (Add types to lists)
         self.LIST_CONTENT_TYPE_LIST_ID = os.getenv('LIST_CONTENT_TYPE_LIST_ID')
         self.LIST_CONTENT_TYPE_CTYPE_ID = os.getenv('LIST_CONTENT_TYPE_CTYPE_ID')
+
+        # Stage 6 Constants (Add Calculations to types)
+        self.CALCULATIONS_LIST_ID = os.getenv('CALCULATIONS_LIST_ID')
+        self.CALCULATIONS_CTYPE_ID = os.getenv('CALCULATIONS_CTYPE_ID')
     
     def preload_caches(self):
         """Pre-load caches from existing sheet data to support non-sequential runs."""
@@ -110,7 +115,7 @@ class VitroAutomation:
         
         # Pre-load sheet headers
         self.sheet_headers = {}
-        for sheet_name in [self.SHEET_SITES, self.SHEET_LISTS, self.SHEET_CTYPES_UNIQUE, self.SHEET_ATTRIBUTES_UNIQUE, self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE, self.SHEET_CTYPES]:
+        for sheet_name in [self.SHEET_SITES, self.SHEET_LISTS, self.SHEET_CTYPES_UNIQUE, self.SHEET_ATTRIBUTES_UNIQUE, self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE, self.SHEET_CTYPES, self.SHEET_CALCULATIONS]:
             ws = self.get_sheet(sheet_name)
             if ws:
                 self.sheet_headers[sheet_name] = ws.row_values(1)
@@ -864,6 +869,68 @@ class VitroAutomation:
         time.sleep(self.google_api_delay)  # Rate limiting before flush
         self.flush_batch_updates()
     
+    def stage_6_add_calculations_to_types(self):
+        """Stage 6: Adding calculations to types."""
+        print("\n" + "="*60)
+        print("Stage 6: Adding calculations to types.")
+        print("="*60)
+
+        time.sleep(self.google_api_delay)  # Rate limiting
+        records = self.get_all_records(self.SHEET_CALCULATIONS)
+        if not records:
+            print(f"No records found in {self.SHEET_CALCULATIONS} sheet")
+            return
+        
+        for idx, record in enumerate(records, start=2):
+            try:
+                # MIGRATION_APPROVED check
+                if not self.convert_value(record.get("MIGRATION_APPROVED"), "bool"):
+                    print(f"Row {idx}: Not approved for migration, skipping...")
+                    continue
+                
+                # Idempotency check
+                if self.is_idempotent_record(record, "SYNC_DONE"):
+                    print(f"Row {idx}: Already synced, skipping...")
+                    continue
+
+                #Empty formula check
+                formula = record.get("MP_ATTRIBUTE_FORMULA")
+                if not formula or formula.strip() == "":
+                    self.log_to_sheet(self.SHEET_CALCULATIONS, idx, "Skipped because formula is empty")
+                    continue
+                
+                # Values
+                attribute_name = record.get("MP_ATTRIBUTE_NAME")
+                attribute_to_set_value = record.get("MP_ATTRIBUTE_TO_SET_VALUE")
+                attribute_name_to_set_value = attribute_to_set_value if attribute_to_set_value else attribute_name
+                    
+                # Build payload
+                data = {
+                    "list_id": self.CALCULATIONS_LIST_ID,
+                    "content_type_id": self.CALCULATIONS_CTYPE_ID,
+                    "name": attribute_name_to_set_value,
+                    "content_type": record.get("MP_CTYPE_ID"),
+                    "formula": formula
+                }
+                
+                data = {k: v for k, v in data.items() if v is not None}
+                
+                # API call
+                response = self.api_client.update_mp_list(data)
+                
+                if response and response.get('id'):
+                    self.update_sheet_cell(self.SHEET_CALCULATIONS, idx, "SYNC_DONE", "SUCCESS")
+                    self.log_to_sheet(self.SHEET_CALCULATIONS, idx, "Calculation added to type")
+                else:
+                    self.log_to_sheet(self.SHEET_CALCULATIONS, idx, f"ERROR: {response}")
+            
+            except Exception as e:
+                self.log_to_sheet(self.SHEET_CALCULATIONS, idx, f"ERROR: {str(e)}")
+        
+        # Flush all queued batch updates
+        time.sleep(self.google_api_delay)  # Rate limiting before flush
+        self.flush_batch_updates()
+
     def run_all_stages(self):
         """Run all migration stages in sequence."""
         try:
@@ -876,6 +943,7 @@ class VitroAutomation:
             self.stage_3_create_attributes()
             self.stage_4_add_attributes_to_types()
             self.stage_5_add_ctypes_to_lists()
+            self.stage_6_add_calculations_to_types()
             
             print("\n" + "="*60)
             print("MIGRATION COMPLETE")
