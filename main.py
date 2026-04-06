@@ -750,8 +750,8 @@ class VitroAutomation:
                 
                 # Skip if MP_ATTRIBUTE_INTERNAL_NAME == "name" or "Title"
                 mp_internal_name = record.get("MP_ATTRIBUTE_INTERNAL_NAME", "").strip()
-                if mp_internal_name.lower() == "name":
-                    self.log_to_sheet(self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE, idx, "Skipped because MP_ATTRIBUTE_INTERNAL_NAME is 'name'")
+                if mp_internal_name.lower() == "name" or mp_internal_name.lower() == "file_leaf_ref":
+                    self.log_to_sheet(self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE, idx, "Skipped because MP_ATTRIBUTE_INTERNAL_NAME is 'name' or 'file_leaf_ref'")
                     continue
                 
                 # Idempotency check
