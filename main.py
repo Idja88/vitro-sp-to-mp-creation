@@ -759,21 +759,17 @@ class VitroAutomation:
                     print(f"Row {idx}: Already synced, skipping...")
                     continue
                 
-                # Lookup values using XLOOKUP logic
-                ctype_name = record.get("MP_CTYPE_NAME")
-                attr_name = record.get("MP_ATTRIBUTE_NAME")
+                # Use IDs directly from the current sheet row (no cache)
+                ctype_id = record.get("MP_CTYPE_ID")
+                attr_id = record.get("MP_ATTRIBUTE_ID")
                 
-                # Try to get from cache, if not present skip for now
-                if ctype_name not in self.ctype_cache:
-                    self.log_to_sheet(self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE, idx, f"WARNING: Content type not found in cache: {ctype_name}")
+                if not ctype_id:
+                    self.log_to_sheet(self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE, idx, "WARNING: MP_CTYPE_ID is empty in current row")
                     continue
                 
-                if attr_name not in self.attr_cache:
-                    self.log_to_sheet(self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE, idx, f"WARNING: Attribute not found in cache: {attr_name}")
+                if not attr_id:
+                    self.log_to_sheet(self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE, idx, "WARNING: MP_ATTRIBUTE_ID is empty in current row")
                     continue
-                
-                ctype_id = self.ctype_cache[ctype_name]
-                attr_id = self.attr_cache[attr_name]
                 
                 # Build payload
                 data = {
@@ -782,7 +778,8 @@ class VitroAutomation:
                     "content_type": ctype_id,
                     "field": attr_id,
                     "required": self.convert_value(record.get("MP_ATTRIBUTE_IS_REQUIRED"), "bool"),
-                    "read_only": self.convert_value(record.get("MP_ATTRIBUTE_IS_READ_ONLY"), "bool")
+                    "read_only": self.convert_value(record.get("MP_ATTRIBUTE_IS_READ_ONLY"), "bool"),
+                    "activity": self.convert_value(record.get("MP_ATTRIBUTE_IS_ACTIVITY"), "bool")
                 }
                 
                 data = {k: v for k, v in data.items() if v is not None}
@@ -828,20 +825,17 @@ class VitroAutomation:
                     print(f"Row {idx}: Already synced, skipping...")
                     continue
                 
-                # Lookup values
-                list_name = record.get("MP_LIST_NAME")
-                ctype_name = record.get("MP_CTYPE_NAME")
+                # Use IDs directly from the current sheet row (no cache)
+                list_id = record.get("MP_LIST_ID")
+                ctype_id = record.get("MP_CTYPE_ID")
                 
-                if list_name not in self.list_cache:
-                    self.log_to_sheet(self.SHEET_CTYPES, idx, f"WARNING: List not found in cache: {list_name}")
+                if not list_id:
+                    self.log_to_sheet(self.SHEET_CTYPES, idx, "WARNING: MP_LIST_ID is empty in current row")
                     continue
                 
-                if ctype_name not in self.ctype_cache:
-                    self.log_to_sheet(self.SHEET_CTYPES, idx, f"WARNING: Content type not found in cache: {ctype_name}")
+                if not ctype_id:
+                    self.log_to_sheet(self.SHEET_CTYPES, idx, "WARNING: MP_CTYPE_ID is empty in current row")
                     continue
-                
-                list_id = self.list_cache[list_name]
-                ctype_id = self.ctype_cache[ctype_name]
                 
                 # Build payload
                 data = {
