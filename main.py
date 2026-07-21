@@ -41,14 +41,10 @@ class VitroAutomation:
         # Open Google Sheets
         self.spreadsheet = self.gc.open_by_key(self.spreadsheet_id)
 
-        # Cache for lookups (to avoid duplicate requests)
-        self.site_cache = {}  # MP_SITE_NAME -> MP_SITE_ID
-        self.ctype_cache = {}  # MP_CTYPE_NAME -> MP_CTYPE_ID
-        self.attr_cache = {}  # MP_ATTRIBUTE_NAME -> MP_ATTRIBUTE_ID
-        self.list_cache = {}  # MP_LIST_NAME -> MP_LIST_ID
-
         # Batch update queue: {sheet_name: {col_idx: [(row, value), ...]}}
         self.batch_updates = {}
+
+        self.sheet_headers = {}
 
         # Rate limiting for Google Sheets API (60 req/min = 1 req/sec limit)
         self.google_api_delay = (
@@ -113,68 +109,20 @@ class VitroAutomation:
         self.CALCULATIONS_LIST_ID = os.getenv("CALCULATIONS_LIST_ID")
         self.CALCULATIONS_CTYPE_ID = os.getenv("CALCULATIONS_CTYPE_ID")
 
-    def preload_caches(self):
-        """Pre-load caches from existing sheet data to support non-sequential runs."""
-        print("\nPre-loading caches from sheet data...")
-
-        # Pre-load sheet headers
-        self.sheet_headers = {}
-        for sheet_name in [
-            self.SHEET_SITES,
-            self.SHEET_LISTS,
-            self.SHEET_CTYPES_UNIQUE,
-            self.SHEET_ATTRIBUTES_UNIQUE,
-            self.SHEET_CTYPES_TO_ATTRIBUTES_UNIQUE,
-            self.SHEET_CTYPES,
-            self.SHEET_CALCULATIONS,
-        ]:
-            ws = self.get_sheet(sheet_name)
-            if ws:
-                self.sheet_headers[sheet_name] = ws.row_values(1)
-
-        # Load sites
-        site_records = self.get_all_records(self.SHEET_SITES)
-        for record in site_records:
-            site_name = record.get("MP_SITE_NAME")
-            site_id = record.get("MP_SITE_ID")
-            if site_name and site_id:
-                self.site_cache[site_name] = site_id
-
-        # Load lists
-        list_records = self.get_all_records(self.SHEET_LISTS)
-        for record in list_records:
-            list_name = record.get("MP_LIST_INTERNAL_NAME")
-            list_id = record.get("MP_LIST_ID")
-            if list_name and list_id:
-                self.list_cache[list_name] = list_id
-
-        # Load content types
-        ctype_records = self.get_all_records(self.SHEET_CTYPES_UNIQUE)
-        for record in ctype_records:
-            ctype_name = record.get("MP_CTYPE_NAME")
-            ctype_id = record.get("MP_CTYPE_ID")
-            if ctype_name and ctype_id:
-                self.ctype_cache[ctype_name] = ctype_id
-
-        # Load attributes
-        attr_records = self.get_all_records(self.SHEET_ATTRIBUTES_UNIQUE)
-        for record in attr_records:
-            attr_name = record.get("MP_ATTRIBUTE_INTERNAL_NAME")
-            attr_id = record.get("MP_ATTRIBUTE_ID")
-            if attr_name and attr_id:
-                self.attr_cache[attr_name] = attr_id
-
-        print(
-            f"Loaded {len(self.list_cache)} lists, {len(self.ctype_cache)} types, {len(self.attr_cache)} attributes"
-        )
-
-    def get_sheet(self, sheet_name: str):
+    def get_sheet(self, sheet_name: str) -> gspread.Worksheet:
         """Get worksheet by name."""
         try:
             return self.spreadsheet.worksheet(sheet_name)
         except gspread.exceptions.WorksheetNotFound:
             print(f"Worksheet '{sheet_name}' not found")
             return None
+
+    def get_sheet_headers(self, sheet_name: str) -> List[str]:
+        if sheet_name not in self.sheet_headers:
+            ws = self.get_sheet(sheet_name)
+            if ws:
+                self.sheet_headers[sheet_name] = ws.row_values(1)
+        return self.sheet_headers.get(sheet_name)
 
     def get_all_records(self, sheet_name: str) -> List[Dict]:
         """Get all records from a worksheet."""
@@ -287,7 +235,7 @@ class VitroAutomation:
         log_message = f"[{timestamp}] {message}"
 
         # Get headers
-        headers = self.sheet_headers.get(sheet_name)
+        headers = self.get_sheet_headers(sheet_name)
         if headers and column_name in headers:
             col_index = headers.index(column_name) + 1
 
@@ -306,7 +254,7 @@ class VitroAutomation:
         self, sheet_name: str, row_index: int, column_name: str, value: str
     ):
         """Queue a cell update for batch update."""
-        headers = self.sheet_headers.get(sheet_name)
+        headers = self.get_sheet_headers(sheet_name)
         if headers and column_name in headers:
             col_index = headers.index(column_name) + 1
 
@@ -456,7 +404,6 @@ class VitroAutomation:
                     self.update_sheet_cell(
                         self.SHEET_SITES, idx, "MP_LIST_OF_LISTS_ID", list_of_lists_id
                     )
-                    self.list_cache[record.get("MP_SITE_NAME")] = site_id
                     self.log_to_sheet(self.SHEET_SITES, idx, f"Site created: {site_id}")
                 else:
                     self.log_to_sheet(self.SHEET_SITES, idx, f"ERROR: {response}")
@@ -517,7 +464,6 @@ class VitroAutomation:
                 if response and response.get("id"):
                     list_id = response.get("id")
                     self.update_sheet_cell(self.SHEET_LISTS, idx, "MP_LIST_ID", list_id)
-                    self.list_cache[record.get("MP_LIST_NAME")] = list_id
                     self.log_to_sheet(self.SHEET_LISTS, idx, f"List created: {list_id}")
                 else:
                     self.log_to_sheet(self.SHEET_LISTS, idx, f"ERROR: {response}")
@@ -586,7 +532,6 @@ class VitroAutomation:
                     self.update_sheet_cell(
                         self.SHEET_CTYPES_UNIQUE, idx, "MP_CTYPE_ID", ctype_id
                     )
-                    self.ctype_cache[record.get("MP_CTYPE_NAME")] = ctype_id
                     self.log_to_sheet(
                         self.SHEET_CTYPES_UNIQUE,
                         idx,
@@ -815,7 +760,6 @@ class VitroAutomation:
                     self.update_sheet_cell(
                         self.SHEET_ATTRIBUTES_UNIQUE, idx, "MP_ATTRIBUTE_ID", attr_id
                     )
-                    self.attr_cache[record.get("MP_ATTRIBUTE_NAME")] = attr_id
                     self.log_to_sheet(
                         self.SHEET_ATTRIBUTES_UNIQUE,
                         idx,
@@ -871,7 +815,7 @@ class VitroAutomation:
                     print(f"Row {idx}: Already synced, skipping...")
                     continue
 
-                # Use IDs directly from the current sheet row (no cache)
+                # Use IDs directly from the current sheet row
                 ctype_id = record.get("MP_CTYPE_ID")
                 attr_id = record.get("MP_ATTRIBUTE_ID")
 
@@ -966,7 +910,7 @@ class VitroAutomation:
                     print(f"Row {idx}: Already synced, skipping...")
                     continue
 
-                # Use IDs directly from the current sheet row (no cache)
+                # Use IDs directly from the current sheet row
                 list_id = record.get("MP_LIST_ID")
                 ctype_id = record.get("MP_CTYPE_ID")
 
@@ -1089,9 +1033,6 @@ class VitroAutomation:
     def run_all_stages(self):
         """Run all migration stages in sequence."""
         try:
-            # Pre-load caches from existing data
-            self.preload_caches()
-
             self.stage_0_create_sites()
             self.stage_1_create_lists()
             self.stage_2_create_ctypes()
