@@ -993,35 +993,39 @@ class VitroAutomation:
                 # Values
                 attribute_name = record.get("MP_ATTRIBUTE_NAME")
                 attribute_to_set_value = record.get("MP_ATTRIBUTE_TO_SET_VALUE")
-                attribute_name_to_set_value = (
-                    attribute_to_set_value if attribute_to_set_value else attribute_name
+                attribute_to_set_value_list = self.convert_to_array(
+                    attribute_to_set_value
                 )
 
-                # Build payload
-                data = {
-                    "list_id": self.CALCULATIONS_LIST_ID,
-                    "content_type_id": self.CALCULATIONS_CTYPE_ID,
-                    "name": attribute_name_to_set_value,
-                    "content_type": record.get("MP_CTYPE_ID"),
-                    "formula": formula,
-                }
+                if not attribute_to_set_value_list:
+                    attribute_to_set_value_list = [attribute_name]
 
-                data = {k: v for k, v in data.items() if v is not None}
+                for attribute_name_to_set_value in attribute_to_set_value_list:
+                    # Build payload
+                    data = {
+                        "list_id": self.CALCULATIONS_LIST_ID,
+                        "content_type_id": self.CALCULATIONS_CTYPE_ID,
+                        "name": attribute_name_to_set_value,
+                        "content_type": record.get("MP_CTYPE_ID"),
+                        "formula": formula,
+                    }
 
-                # API call
-                response = self.api_client.update_mp_list(data)
+                    data = {k: v for k, v in data.items() if v is not None}
 
-                if response and response.get("id"):
-                    self.update_sheet_cell(
-                        self.SHEET_CALCULATIONS, idx, "SYNC_DONE", "SUCCESS"
-                    )
-                    self.log_to_sheet(
-                        self.SHEET_CALCULATIONS, idx, "Calculation added to type"
-                    )
-                else:
-                    self.log_to_sheet(
-                        self.SHEET_CALCULATIONS, idx, f"ERROR: {response}"
-                    )
+                    # API call
+                    response = self.api_client.update_mp_list(data)
+
+                    if response and response.get("id"):
+                        self.update_sheet_cell(
+                            self.SHEET_CALCULATIONS, idx, "SYNC_DONE", "SUCCESS"
+                        )
+                        self.log_to_sheet(
+                            self.SHEET_CALCULATIONS, idx, "Calculation added to type"
+                        )
+                    else:
+                        self.log_to_sheet(
+                            self.SHEET_CALCULATIONS, idx, f"ERROR: {response}"
+                        )
 
             except Exception as e:
                 self.log_to_sheet(self.SHEET_CALCULATIONS, idx, f"ERROR: {str(e)}")
